@@ -128,6 +128,7 @@ func _poll_ws() -> void:
 			WebSocketPeer.STATE_CLOSED:
 				print("[WS] 연결 종료/실패")
 		_ws_state = state
+		queue_redraw()  # CL-020: 연결 상태 텍스트 갱신
 
 	if state == WebSocketPeer.STATE_OPEN:
 		if not _joined:
@@ -166,12 +167,33 @@ func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=floor_y)이 캐릭터가 서는 기준선.
 	draw_rect(Rect2(0, floor_y, world_width, 240.0 - floor_y), Color(0.36, 0.27, 0.18))
 
+	_draw_connection_status()
+
 	# 원격 캐릭터(친구)
 	for id in remote_players:
 		_draw_character(remote_players[id]["floor_x"], PLAYER_COLORS[id])
 
 	# 내 캐릭터
 	_draw_character(my_floor_x, PLAYER_COLORS[my_player_id])
+
+func _draw_connection_status() -> void:
+	# CL-020: 현재 WebSocket 연결 상태를 좌상단에 표시. latency는 서버 heartbeat 준비 후(보류).
+	var label := ""
+	var color := Color.WHITE
+	match _ws_state:
+		WebSocketPeer.STATE_OPEN:
+			label = "연결됨"
+			color = Color(0.3, 0.85, 0.3)
+		WebSocketPeer.STATE_CONNECTING:
+			label = "연결 중…"
+			color = Color(0.95, 0.85, 0.2)
+		WebSocketPeer.STATE_CLOSING:
+			label = "종료 중…"
+			color = Color(0.95, 0.85, 0.2)
+		_:
+			label = "끊김"
+			color = Color(0.9, 0.3, 0.3)
+	draw_string(ThemeDB.fallback_font, Vector2(8, 16), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
 
 func _draw_character(floor_x: float, color: Color) -> void:
 	# 밑변이 바닥선(floor_y)에 닿도록 도형을 세운다.
