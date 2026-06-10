@@ -67,9 +67,17 @@ func _position_window_bottom() -> void:
 	var pos_y := usable.position.y + usable.size.y - win_size.y
 	DisplayServer.window_set_position(Vector2i(pos_x, pos_y))
 
+## CL-021: always-on-top 현재 상태 (project.godot window/size/always_on_top=true 기본값과 일치)
+var _always_on_top := true
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):  # ESC
 		get_tree().quit()
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T:
+		# CL-021: T 키로 always-on-top 토글
+		_always_on_top = not _always_on_top
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, _always_on_top)
+		print("[CL-021] always-on-top: ", _always_on_top)
 	elif event.is_action_pressed("ui_left"):
 		_left_held = true
 		_set_dir(-1)
