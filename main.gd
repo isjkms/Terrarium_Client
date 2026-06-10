@@ -8,9 +8,22 @@ const FLOOR_Y := 220.0
 const CHAR_WIDTH := 24.0
 const CHAR_HEIGHT := 40.0
 
+## playerId → 색상 (protocol.md 캐릭터 색상)
+const PLAYER_COLORS := {
+	"p1": Color(0.2, 0.4, 0.9),    # 파랑
+	"p2": Color(0.9, 0.25, 0.25),  # 빨강
+	"p3": Color(0.3, 0.75, 0.3),   # 초록
+	"p4": Color(0.95, 0.85, 0.2),  # 노랑
+}
+
 ## 내 캐릭터 (서버 연결 전 고정값). floor_x는 0.0~1.0 비율.
+var my_player_id := "p1"
 var my_floor_x := 0.5
-const MY_COLOR := Color(0.2, 0.4, 0.9)  # p1 = 파랑
+
+## 원격 캐릭터 (서버 연결 전 더미. CL-012에서 state 데이터로 교체)
+var remote_players := {
+	"p2": { "floor_x": 0.75 },
+}
 
 ## 이동 속도 (픽셀/초). floorX는 비율이라 WORLD_WIDTH로 나눠 비율 증분으로 변환.
 const MOVE_SPEED := 220.0
@@ -59,6 +72,14 @@ func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=FLOOR_Y)이 캐릭터가 서는 기준선.
 	draw_rect(Rect2(0, FLOOR_Y, WORLD_WIDTH, 240.0 - FLOOR_Y), Color(0.36, 0.27, 0.18))
 
-	# 내 캐릭터: 밑변이 바닥선(FLOOR_Y)에 닿도록 세운다.
-	var px := my_floor_x * WORLD_WIDTH
-	draw_rect(Rect2(px - CHAR_WIDTH / 2.0, FLOOR_Y - CHAR_HEIGHT, CHAR_WIDTH, CHAR_HEIGHT), MY_COLOR)
+	# 원격 캐릭터(친구)
+	for id in remote_players:
+		_draw_character(remote_players[id]["floor_x"], PLAYER_COLORS[id])
+
+	# 내 캐릭터
+	_draw_character(my_floor_x, PLAYER_COLORS[my_player_id])
+
+func _draw_character(floor_x: float, color: Color) -> void:
+	# 밑변이 바닥선(FLOOR_Y)에 닿도록 도형을 세운다.
+	var px := floor_x * WORLD_WIDTH
+	draw_rect(Rect2(px - CHAR_WIDTH / 2.0, FLOOR_Y - CHAR_HEIGHT, CHAR_WIDTH, CHAR_HEIGHT), color)
