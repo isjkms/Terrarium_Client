@@ -54,7 +54,9 @@ func _ready() -> void:
 		push_error("[WS] 연결 시도 실패: %s" % error_string(err))
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_left"):
+	if event.is_action_pressed("ui_cancel"):  # ESC
+		get_tree().quit()
+	elif event.is_action_pressed("ui_left"):
 		_left_held = true
 		_set_dir(-1)
 	elif event.is_action_released("ui_left"):
