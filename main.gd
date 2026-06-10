@@ -142,6 +142,9 @@ func _handle(msg: Dictionary) -> void:
 					continue
 				remote_players[p["id"]] = { "floor_x": p["floorX"], "facing": p["facing"] }
 			queue_redraw()
+		"player_left":
+			remote_players.erase(msg["playerId"])
+			queue_redraw()
 
 func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=floor_y)이 캐릭터가 서는 기준선.
