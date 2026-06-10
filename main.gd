@@ -12,6 +12,9 @@ const CHAR_HEIGHT := 40.0
 var my_floor_x := 0.5
 const MY_COLOR := Color(0.2, 0.4, 0.9)  # p1 = 파랑
 
+## 이동 속도 (픽셀/초). floorX는 비율이라 WORLD_WIDTH로 나눠 비율 증분으로 변환.
+const MOVE_SPEED := 220.0
+
 ## 입력 상태 (실제 이동 적용은 CL-006)
 var _left_held := false
 var _right_held := false
@@ -44,6 +47,12 @@ func _recompute_dir() -> void:
 		_set_dir(-1)
 	else:
 		move_dir = 0
+
+func _process(delta: float) -> void:
+	# delta 기반 이동으로 FPS와 무관하게 일정 속도. clamp(0~1)는 CL-007.
+	if move_dir != 0:
+		my_floor_x += move_dir * (MOVE_SPEED / WORLD_WIDTH) * delta
+		queue_redraw()
 
 func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=FLOOR_Y)이 캐릭터가 서는 기준선.
