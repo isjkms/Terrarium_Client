@@ -34,6 +34,16 @@ var _right_held := false
 var move_dir := 0          # -1=왼, 0=정지, +1=오른
 var facing := "right"      # protocol.md move의 facing 필드
 
+## 서버 연결 (protocol.md)
+const WS_URL := "ws://13.209.96.232:8080/ws"
+var _ws := WebSocketPeer.new()
+var _ws_state := WebSocketPeer.STATE_CLOSED
+
+func _ready() -> void:
+	var err := _ws.connect_to_url(WS_URL)
+	if err != OK:
+		push_error("[WS] 연결 시도 실패: %s" % error_string(err))
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_left"):
 		_left_held = true
@@ -62,11 +72,24 @@ func _recompute_dir() -> void:
 		move_dir = 0
 
 func _process(delta: float) -> void:
+	_poll_ws()
+
 	# delta 기반 이동으로 FPS와 무관하게 일정 속도.
 	if move_dir != 0:
 		my_floor_x += move_dir * (MOVE_SPEED / WORLD_WIDTH) * delta
 		my_floor_x = clampf(my_floor_x, 0.0, 1.0)
 		queue_redraw()
+
+func _poll_ws() -> void:
+	_ws.poll()
+	var state := _ws.get_ready_state()
+	if state != _ws_state:
+		match state:
+			WebSocketPeer.STATE_OPEN:
+				print("[WS] 연결 성공: ", WS_URL)
+			WebSocketPeer.STATE_CLOSED:
+				print("[WS] 연결 종료/실패")
+		_ws_state = state
 
 func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=FLOOR_Y)이 캐릭터가 서는 기준선.
