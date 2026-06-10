@@ -49,9 +49,10 @@ func _recompute_dir() -> void:
 		move_dir = 0
 
 func _process(delta: float) -> void:
-	# delta 기반 이동으로 FPS와 무관하게 일정 속도. clamp(0~1)는 CL-007.
+	# delta 기반 이동으로 FPS와 무관하게 일정 속도.
 	if move_dir != 0:
 		my_floor_x += move_dir * (MOVE_SPEED / WORLD_WIDTH) * delta
+		my_floor_x = clampf(my_floor_x, 0.0, 1.0)
 		queue_redraw()
 
 func _draw() -> void:
