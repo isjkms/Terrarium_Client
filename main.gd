@@ -115,8 +115,9 @@ func _setup_chat_input() -> void:
 	_chat_input = LineEdit.new()
 	_chat_input.placeholder_text = "메시지 입력 (Enter 전송 / Esc 취소)"
 	_chat_input.max_length = CHAT_MAX_LENGTH
-	_chat_input.custom_minimum_size = Vector2(320, 0)
-	_chat_input.size = Vector2(320, 0)
+	_chat_input.add_theme_font_size_override("font_size", CHAT_FONT_SIZE)
+	_chat_input.custom_minimum_size = Vector2(CHAT_INPUT_WIDTH, 44)
+	_chat_input.size = Vector2(CHAT_INPUT_WIDTH, 44)
 	_chat_input.visible = false
 	add_child(_chat_input)
 	_chat_input.text_submitted.connect(_on_chat_submitted)
@@ -183,6 +184,8 @@ var _tray_menu := RID()
 ## CL-031: 말풍선 채팅 (protocol.md chat 타입)
 const CHAT_BUBBLE_TTL := 5.0      # 4.3.1: 전송 시점부터 5초 표시
 const CHAT_MAX_LENGTH := 100
+const CHAT_FONT_SIZE := 22
+const CHAT_INPUT_WIDTH := 480.0
 var _chat_input: LineEdit
 var _chat_active := false
 var _chat_bubbles := {}           # playerId -> { "text": String, "ttl": float }
@@ -198,6 +201,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		# CL-031: Enter로 채팅 입력 진입 (입력 중 Enter는 LineEdit이 소비해 전송됨)
 		if not _chat_active:
 			_open_chat()
+			# 진입에 쓴 Enter가 방금 포커스 받은 LineEdit으로 새어들어가 두 번 입력되는 것을 막는다.
+			get_viewport().set_input_as_handled()
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T:
 		# CL-021: T 키로 always-on-top 토글
 		_always_on_top = not _always_on_top
@@ -394,9 +399,9 @@ func _draw_bubbles() -> void:
 
 func _draw_bubble(floor_x: float, text: String) -> void:
 	var font := ThemeDB.fallback_font
-	var fs := 16
+	var fs := CHAT_FONT_SIZE
 	var ts := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
-	var pad := Vector2(10, 6)
+	var pad := Vector2(14, 9)
 	var box_w := ts.x + pad.x * 2.0
 	var box_h := ts.y + pad.y * 2.0
 	var px := floor_x * world_width
