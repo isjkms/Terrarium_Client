@@ -1,8 +1,8 @@
 extends Node2D
 
-## 월드 기준값 (protocol.md: world.width=1280, world.floorY=220)
-const WORLD_WIDTH := 1280.0
-const FLOOR_Y := 220.0
+## 월드 기준값 (protocol.md 기본값. welcome 수신 시 서버 값으로 갱신)
+var world_width := 1280.0
+var floor_y := 220.0
 
 ## 캐릭터 도형 크기
 const CHAR_WIDTH := 24.0
@@ -25,7 +25,7 @@ var remote_players := {
 	"p2": { "floor_x": 0.75 },
 }
 
-## 이동 속도 (픽셀/초). floorX는 비율이라 WORLD_WIDTH로 나눠 비율 증분으로 변환.
+## 이동 속도 (픽셀/초). floorX는 비율이라 world_width로 나눠 비율 증분으로 변환.
 const MOVE_SPEED := 220.0
 
 ## 입력 상태 (실제 이동 적용은 CL-006)
@@ -34,10 +34,13 @@ var _right_held := false
 var move_dir := 0          # -1=왼, 0=정지, +1=오른
 var facing := "right"      # protocol.md move의 facing 필드
 
-## 서버 연결 (protocol.md)
+## 서버 연결 (protocol.md). roomId/name은 P0 고정값 (룸/닉네임 UI는 P1).
 const WS_URL := "ws://13.209.96.232:8080/ws"
+const ROOM_ID := "ROOM01"
+const PLAYER_NAME := "player"
 var _ws := WebSocketPeer.new()
 var _ws_state := WebSocketPeer.STATE_CLOSED
+var _joined := false       # STATE_OPEN 첫 프레임 join 중복 전송 방지
 
 func _ready() -> void:
 	var err := _ws.connect_to_url(WS_URL)
@@ -76,7 +79,7 @@ func _process(delta: float) -> void:
 
 	# delta 기반 이동으로 FPS와 무관하게 일정 속도.
 	if move_dir != 0:
-		my_floor_x += move_dir * (MOVE_SPEED / WORLD_WIDTH) * delta
+		my_floor_x += move_dir * (MOVE_SPEED / world_width) * delta
 		my_floor_x = clampf(my_floor_x, 0.0, 1.0)
 		queue_redraw()
 
@@ -91,9 +94,31 @@ func _poll_ws() -> void:
 				print("[WS] 연결 종료/실패")
 		_ws_state = state
 
+	if state == WebSocketPeer.STATE_OPEN:
+		if not _joined:
+			# STATE_OPEN 첫 프레임에 한 번만 전송 (protocol.md: 첫 메시지는 반드시 join)
+			_send({ "type": "join", "roomId": ROOM_ID, "name": PLAYER_NAME })
+			_joined = true
+		while _ws.get_available_packet_count() > 0:
+			var msg = JSON.parse_string(_ws.get_packet().get_string_from_utf8())
+			if msg != null:
+				_handle(msg)
+
+func _send(data: Dictionary) -> void:
+	_ws.send_text(JSON.stringify(data))
+
+func _handle(msg: Dictionary) -> void:
+	match msg.get("type"):
+		"welcome":
+			my_player_id = msg["playerId"]
+			world_width = msg["world"]["width"]
+			floor_y = msg["world"]["floorY"]
+			print("[WS] welcome: playerId=%s world.width=%s floorY=%s" % [my_player_id, world_width, floor_y])
+			queue_redraw()
+
 func _draw() -> void:
-	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=FLOOR_Y)이 캐릭터가 서는 기준선.
-	draw_rect(Rect2(0, FLOOR_Y, WORLD_WIDTH, 240.0 - FLOOR_Y), Color(0.36, 0.27, 0.18))
+	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=floor_y)이 캐릭터가 서는 기준선.
+	draw_rect(Rect2(0, floor_y, world_width, 240.0 - floor_y), Color(0.36, 0.27, 0.18))
 
 	# 원격 캐릭터(친구)
 	for id in remote_players:
@@ -103,6 +128,6 @@ func _draw() -> void:
 	_draw_character(my_floor_x, PLAYER_COLORS[my_player_id])
 
 func _draw_character(floor_x: float, color: Color) -> void:
-	# 밑변이 바닥선(FLOOR_Y)에 닿도록 도형을 세운다.
-	var px := floor_x * WORLD_WIDTH
-	draw_rect(Rect2(px - CHAR_WIDTH / 2.0, FLOOR_Y - CHAR_HEIGHT, CHAR_WIDTH, CHAR_HEIGHT), color)
+	# 밑변이 바닥선(floor_y)에 닿도록 도형을 세운다.
+	var px := floor_x * world_width
+	draw_rect(Rect2(px - CHAR_WIDTH / 2.0, floor_y - CHAR_HEIGHT, CHAR_WIDTH, CHAR_HEIGHT), color)
