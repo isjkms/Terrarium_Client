@@ -42,6 +42,12 @@ var _ws := WebSocketPeer.new()
 var _ws_state := WebSocketPeer.STATE_CLOSED
 var _joined := false       # STATE_OPEN 첫 프레임 join 중복 전송 방지
 
+## move 송신 (20Hz throttle + 값 변화 감지)
+const MOVE_SEND_INTERVAL := 0.05
+var _send_accum := 0.0
+var _last_sent_floor_x := -1.0
+var _last_sent_facing := ""
+
 func _ready() -> void:
 	var err := _ws.connect_to_url(WS_URL)
 	if err != OK:
@@ -82,6 +88,19 @@ func _process(delta: float) -> void:
 		my_floor_x += move_dir * (MOVE_SPEED / world_width) * delta
 		my_floor_x = clampf(my_floor_x, 0.0, 1.0)
 		queue_redraw()
+
+	_send_move(delta)
+
+func _send_move(delta: float) -> void:
+	# 20Hz 주기로 체크하고, 직전 전송값과 달라졌을 때만 move 전송.
+	_send_accum += delta
+	if not _joined or _send_accum < MOVE_SEND_INTERVAL:
+		return
+	_send_accum = 0.0
+	if my_floor_x != _last_sent_floor_x or facing != _last_sent_facing:
+		_send({ "type": "move", "floorX": my_floor_x, "facing": facing })
+		_last_sent_floor_x = my_floor_x
+		_last_sent_facing = facing
 
 func _poll_ws() -> void:
 	_ws.poll()
