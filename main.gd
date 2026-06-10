@@ -49,12 +49,23 @@ var _last_sent_floor_x := -1.0
 var _last_sent_facing := ""
 
 func _ready() -> void:
+	_position_window_bottom()
+
 	# CL-017 실험: 캐릭터/바닥 외 영역을 투명하게. project.godot의 transparent 설정과 함께 동작.
 	get_viewport().transparent_bg = true
 
 	var err := _ws.connect_to_url(WS_URL)
 	if err != OK:
 		push_error("[WS] 연결 시도 실패: %s" % error_string(err))
+
+func _position_window_bottom() -> void:
+	# CL-018: 주 모니터 하단(작업표시줄 제외 usable rect)에 가로 중앙으로 창 배치.
+	var screen := DisplayServer.window_get_current_screen()
+	var usable := DisplayServer.screen_get_usable_rect(screen)
+	var win_size := DisplayServer.window_get_size()
+	var pos_x := usable.position.x + (usable.size.x - win_size.x) / 2
+	var pos_y := usable.position.y + usable.size.y - win_size.y
+	DisplayServer.window_set_position(Vector2i(pos_x, pos_y))
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):  # ESC
