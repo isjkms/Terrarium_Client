@@ -57,6 +57,7 @@ const GAME_SIZE := Vector2i(1280, 240)
 func _ready() -> void:
 	_configure_game_window()
 	_setup_tray()
+	_setup_chat_input()
 
 	# CL-017 실험: 캐릭터/바닥 외 영역을 투명하게. project.godot의 transparent 설정과 함께 동작.
 	get_viewport().transparent_bg = true
@@ -108,6 +109,66 @@ func _exit_tree() -> void:
 	if _tray_menu.is_valid():
 		NativeMenu.free_menu(_tray_menu)
 
+func _setup_chat_input() -> void:
+	# CL-031: 말풍선 입력용 LineEdit. 평소엔 숨겨두고 Enter로 진입한다.
+	# 영문 유효성 검증은 06_수정요약 결정에 따라 넣지 않는다(한글 IME는 CL-032).
+	_chat_input = LineEdit.new()
+	_chat_input.placeholder_text = "메시지 입력 (Enter 전송 / Esc 취소)"
+	_chat_input.max_length = CHAT_MAX_LENGTH
+	_chat_input.custom_minimum_size = Vector2(320, 0)
+	_chat_input.size = Vector2(320, 0)
+	_chat_input.visible = false
+	add_child(_chat_input)
+	_chat_input.text_submitted.connect(_on_chat_submitted)
+
+func _open_chat() -> void:
+	# 4.1.1: 입력 진입 시 캐릭터 이동을 멈춘다(LineEdit 포커스로 방향키도 소비됨).
+	move_dir = 0
+	_left_held = false
+	_right_held = false
+	_chat_active = true
+	# 내 캐릭터 머리 위로 입력창 위치. 화면(1280) 밖으로 안 나가게 clamp.
+	var px := my_floor_x * world_width
+	var box_w := _chat_input.size.x
+	_chat_input.position = Vector2(clampf(px - box_w / 2.0, 0.0, world_width - box_w), 120.0)
+	_chat_input.text = ""
+	_chat_input.visible = true
+	_chat_input.grab_focus()
+
+func _close_chat() -> void:
+	# 4.1.1: 입력 UI를 닫고 포커스를 게임 화면으로 되돌린다.
+	_chat_active = false
+	_chat_input.visible = false
+	_chat_input.release_focus()
+
+func _on_chat_submitted(text: String) -> void:
+	# 4.3.1: 빈 문자열은 전송하지 않는다.
+	var trimmed := text.strip_edges()
+	if trimmed != "":
+		_send({ "type": "chat", "text": trimmed })
+		# 서버 에코 여부와 무관하게 내 말풍선을 즉시 표시(낙관적).
+		_set_bubble(my_player_id, trimmed)
+	_close_chat()
+
+func _set_bubble(player_id: String, text: String) -> void:
+	# 4.3.1: 새 메시지는 기존 말풍선을 즉시 교체하고 타이머를 리셋한다.
+	_chat_bubbles[player_id] = { "text": text, "ttl": CHAT_BUBBLE_TTL }
+	queue_redraw()
+
+func _tick_bubbles(delta: float) -> void:
+	# 4.3.1: TTL 경과한 말풍선 제거.
+	if _chat_bubbles.is_empty():
+		return
+	var expired := []
+	for id in _chat_bubbles:
+		_chat_bubbles[id]["ttl"] -= delta
+		if _chat_bubbles[id]["ttl"] <= 0.0:
+			expired.append(id)
+	for id in expired:
+		_chat_bubbles.erase(id)
+	if not expired.is_empty():
+		queue_redraw()
+
 ## CL-021: always-on-top 현재 상태 (project.godot window/size/always_on_top=true 기본값과 일치)
 var _always_on_top := true
 
@@ -119,9 +180,24 @@ var _click_through := false
 var _tray_id := -1
 var _tray_menu := RID()
 
+## CL-031: 말풍선 채팅 (protocol.md chat 타입)
+const CHAT_BUBBLE_TTL := 5.0      # 4.3.1: 전송 시점부터 5초 표시
+const CHAT_MAX_LENGTH := 100
+var _chat_input: LineEdit
+var _chat_active := false
+var _chat_bubbles := {}           # playerId -> { "text": String, "ttl": float }
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):  # ESC
-		get_tree().quit()
+		# CL-031: 채팅 입력 중이면 ESC는 취소(전송 안 함), 아니면 기존대로 종료.
+		if _chat_active:
+			_close_chat()
+		else:
+			get_tree().quit()
+	elif event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER):
+		# CL-031: Enter로 채팅 입력 진입 (입력 중 Enter는 LineEdit이 소비해 전송됨)
+		if not _chat_active:
+			_open_chat()
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_T:
 		# CL-021: T 키로 always-on-top 토글
 		_always_on_top = not _always_on_top
@@ -162,6 +238,7 @@ func _recompute_dir() -> void:
 func _process(delta: float) -> void:
 	_poll_ws()
 	_tick_reconnect(delta)
+	_tick_bubbles(delta)
 
 	# delta 기반 이동으로 FPS와 무관하게 일정 속도.
 	if move_dir != 0:
@@ -244,8 +321,12 @@ func _handle(msg: Dictionary) -> void:
 					continue
 				remote_players[p["id"]] = { "floor_x": p["floorX"], "facing": p["facing"] }
 			queue_redraw()
+		"chat":
+			# protocol.md: 수신 chat은 playerId/name/text. 말풍선은 text만 사용.
+			_set_bubble(msg["playerId"], msg["text"])
 		"player_left":
 			remote_players.erase(msg["playerId"])
+			_chat_bubbles.erase(msg["playerId"])
 			queue_redraw()
 		"error":
 			# CL-022: ROOM_FULL 등 서버 error 수신 시 메시지를 들고 메뉴로 복귀.
@@ -267,6 +348,9 @@ func _draw() -> void:
 
 	# 내 캐릭터
 	_draw_character(my_floor_x, PLAYER_COLORS[my_player_id])
+
+	# CL-031: 말풍선 (캐릭터 위)
+	_draw_bubbles()
 
 func _draw_connection_status() -> void:
 	# CL-020: 현재 WebSocket 연결 상태를 좌상단에 표시. latency는 서버 heartbeat 준비 후(보류).
@@ -295,3 +379,30 @@ func _draw_character(floor_x: float, color: Color) -> void:
 	# 밑변이 바닥선(floor_y)에 닿도록 도형을 세운다.
 	var px := floor_x * world_width
 	draw_rect(Rect2(px - CHAR_WIDTH / 2.0, floor_y - CHAR_HEIGHT, CHAR_WIDTH, CHAR_HEIGHT), color)
+
+func _draw_bubbles() -> void:
+	# CL-031: 말풍선이 있는 플레이어의 현재 위치 위에 그린다.
+	for id in _chat_bubbles:
+		var fx: float
+		if id == my_player_id:
+			fx = my_floor_x
+		elif remote_players.has(id):
+			fx = remote_players[id]["floor_x"]
+		else:
+			continue  # 이미 퇴장한 플레이어 등은 건너뛴다.
+		_draw_bubble(fx, _chat_bubbles[id]["text"])
+
+func _draw_bubble(floor_x: float, text: String) -> void:
+	var font := ThemeDB.fallback_font
+	var fs := 16
+	var ts := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs)
+	var pad := Vector2(10, 6)
+	var box_w := ts.x + pad.x * 2.0
+	var box_h := ts.y + pad.y * 2.0
+	var px := floor_x * world_width
+	# 캐릭터 머리 위. 화면(world_width) 밖으로 안 나가게 x를 clamp.
+	var box_x := clampf(px - box_w / 2.0, 0.0, world_width - box_w)
+	var box_y := floor_y - CHAR_HEIGHT - box_h - 8.0
+	draw_rect(Rect2(box_x, box_y, box_w, box_h), Color(1, 1, 1, 0.92), true)
+	draw_rect(Rect2(box_x, box_y, box_w, box_h), Color(0.2, 0.2, 0.2, 0.9), false, 1.0)
+	draw_string(font, Vector2(box_x + pad.x, box_y + pad.y + font.get_ascent(fs)), text, HORIZONTAL_ALIGNMENT_LEFT, -1, fs, Color.BLACK)
