@@ -48,8 +48,11 @@ var _send_accum := 0.0
 var _last_sent_floor_x := -1.0
 var _last_sent_facing := ""
 
+## CL-024: 게임 오버레이 창 크기 (project.godot viewport와 일치)
+const GAME_SIZE := Vector2i(1280, 240)
+
 func _ready() -> void:
-	_position_window_bottom()
+	_configure_game_window()
 
 	# CL-017 실험: 캐릭터/바닥 외 영역을 투명하게. project.godot의 transparent 설정과 함께 동작.
 	get_viewport().transparent_bg = true
@@ -57,6 +60,14 @@ func _ready() -> void:
 	var err := _ws.connect_to_url(WS_URL)
 	if err != OK:
 		push_error("[WS] 연결 시도 실패: %s" % error_string(err))
+
+func _configure_game_window() -> void:
+	# CL-024: 메뉴 씬에서 변경된 창 설정을 게임 오버레이용으로 되돌린다.
+	DisplayServer.window_set_size(GAME_SIZE)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_TRANSPARENT, true)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_BORDERLESS, true)
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, _always_on_top)
+	_position_window_bottom()
 
 func _position_window_bottom() -> void:
 	# CL-018: 주 모니터 하단(작업표시줄 제외 usable rect)에 가로 중앙으로 창 배치.

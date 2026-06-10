@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://cnal08c0udi1j"]
+
+[ext_resource type="Script" path="res://menu.gd" id="1_menu"]
+
+[node name="Menu" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("1_menu")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.12, 0.13, 0.17, 1)
+
+[node name="Center" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="VBox" type="VBoxContainer" parent="Center"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="Title" type="Label" parent="Center/VBox"]
+layout_mode = 2
+text = "Monitor Terrarium"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 40
+
+[node name="StartButton" type="Button" parent="Center/VBox"]
+custom_minimum_size = Vector2(220, 56)
+layout_mode = 2
+text = "시작"
+
+[connection signal="pressed" from="Center/VBox/StartButton" to="." method="_on_start_pressed"]
