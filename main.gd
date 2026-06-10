@@ -56,6 +56,7 @@ const GAME_SIZE := Vector2i(1280, 240)
 
 func _ready() -> void:
 	_configure_game_window()
+	_setup_tray()
 
 	# CL-017 실험: 캐릭터/바닥 외 영역을 투명하게. project.godot의 transparent 설정과 함께 동작.
 	get_viewport().transparent_bg = true
@@ -81,12 +82,42 @@ func _position_window_bottom() -> void:
 	var pos_y := usable.position.y + usable.size.y - win_size.y
 	DisplayServer.window_set_position(Vector2i(pos_x, pos_y))
 
+func _setup_tray() -> void:
+	# CL-026: 시스템 트레이에 아이콘을 등록하고 '종료' 메뉴를 단다.
+	# 트레이 미지원 플랫폼에서는 조용히 건너뛴다(ESC 종료는 그대로 유효).
+	if not DisplayServer.has_feature(DisplayServer.FEATURE_STATUS_INDICATOR):
+		print("[CL-026] 트레이 아이콘 미지원 플랫폼")
+		return
+	var icon: Texture2D = load("res://icon.svg")
+	_tray_id = DisplayServer.create_status_indicator(icon, "Monitor Terrarium", Callable(self, "_on_tray_clicked"))
+	_tray_menu = NativeMenu.create_menu()
+	NativeMenu.add_item(_tray_menu, "종료", Callable(self, "_on_tray_quit"))
+	DisplayServer.status_indicator_set_menu(_tray_id, _tray_menu)
+
+func _on_tray_clicked(_mouse_button: int, _mouse_position: Vector2i) -> void:
+	# 메뉴가 연결돼 있으면 클릭 시 네이티브 메뉴가 자동으로 열리므로 별도 처리는 없다.
+	pass
+
+func _on_tray_quit(_tag: Variant = null) -> void:
+	get_tree().quit()
+
+func _exit_tree() -> void:
+	# CL-026: 트레이 아이콘/메뉴 정리.
+	if _tray_id != -1:
+		DisplayServer.delete_status_indicator(_tray_id)
+	if _tray_menu.is_valid():
+		NativeMenu.free_menu(_tray_menu)
+
 ## CL-021: always-on-top 현재 상태 (project.godot window/size/always_on_top=true 기본값과 일치)
 var _always_on_top := true
 
 ## CL-025: click-through(감상 모드) 현재 상태. 활성 시 창 아래 다른 앱을 클릭할 수 있다.
 ## 마우스 입력은 통과하지만 키보드 입력은 유지되므로 C키로 다시 해제할 수 있다.
 var _click_through := false
+
+## CL-026: 시스템 트레이 아이콘/메뉴. click-through 등으로 창 조작이 어려워도 종료할 수 있는 보조 경로.
+var _tray_id := -1
+var _tray_menu := RID()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):  # ESC
