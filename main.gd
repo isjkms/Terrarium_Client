@@ -116,8 +116,8 @@ func _setup_chat_input() -> void:
 	_chat_input.placeholder_text = "메시지 입력 (Enter 전송 / Esc 취소)"
 	_chat_input.max_length = CHAT_MAX_LENGTH
 	_chat_input.add_theme_font_size_override("font_size", CHAT_FONT_SIZE)
-	_chat_input.custom_minimum_size = Vector2(CHAT_INPUT_WIDTH, 44)
-	_chat_input.size = Vector2(CHAT_INPUT_WIDTH, 44)
+	_chat_input.custom_minimum_size = Vector2(CHAT_INPUT_WIDTH, 56)
+	_chat_input.size = Vector2(CHAT_INPUT_WIDTH, 56)
 	_chat_input.visible = false
 	add_child(_chat_input)
 	_chat_input.text_submitted.connect(_on_chat_submitted)
@@ -184,8 +184,8 @@ var _tray_menu := RID()
 ## CL-031: 말풍선 채팅 (protocol.md chat 타입)
 const CHAT_BUBBLE_TTL := 5.0      # 4.3.1: 전송 시점부터 5초 표시
 const CHAT_MAX_LENGTH := 100
-const CHAT_FONT_SIZE := 22
-const CHAT_INPUT_WIDTH := 480.0
+const CHAT_FONT_SIZE := 30
+const CHAT_INPUT_WIDTH := 560.0
 var _chat_input: LineEdit
 var _chat_active := false
 var _chat_bubbles := {}           # playerId -> { "text": String, "ttl": float }
