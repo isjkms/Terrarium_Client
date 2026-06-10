@@ -134,6 +134,14 @@ func _handle(msg: Dictionary) -> void:
 			floor_y = msg["world"]["floorY"]
 			print("[WS] welcome: playerId=%s world.width=%s floorY=%s" % [my_player_id, world_width, floor_y])
 			queue_redraw()
+		"state":
+			# players 전체 스냅샷으로 원격 캐릭터 재구성. 내 캐릭터는 로컬 입력이 권위라 제외.
+			remote_players.clear()
+			for p in msg["players"]:
+				if p["id"] == my_player_id:
+					continue
+				remote_players[p["id"]] = { "floor_x": p["floorX"], "facing": p["facing"] }
+			queue_redraw()
 
 func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=floor_y)이 캐릭터가 서는 기준선.
