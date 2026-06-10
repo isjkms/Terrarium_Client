@@ -120,7 +120,7 @@ func _setup_chat_input() -> void:
 	_chat_input.size = Vector2(CHAT_INPUT_WIDTH, 56)
 	_chat_input.visible = false
 	add_child(_chat_input)
-	_chat_input.text_submitted.connect(_on_chat_submitted)
+	# CL-032: 전송은 text_submitted 대신 _input()에서 직접 처리(IME 조합 확정 + Enter 1회 전송).
 
 func _open_chat() -> void:
 	# 4.1.1: 입력 진입 시 캐릭터 이동을 멈춘다(LineEdit 포커스로 방향키도 소비됨).
@@ -135,16 +135,19 @@ func _open_chat() -> void:
 	_chat_input.text = ""
 	_chat_input.visible = true
 	_chat_input.grab_focus()
+	# CL-032: 한글 입력을 위해 이 창의 IME를 활성화.
+	DisplayServer.window_set_ime_active(true)
 
 func _close_chat() -> void:
 	# 4.1.1: 입력 UI를 닫고 포커스를 게임 화면으로 되돌린다.
 	_chat_active = false
+	_chat_submit_pending = false
 	_chat_input.visible = false
 	_chat_input.release_focus()
 
-func _on_chat_submitted(text: String) -> void:
-	# 4.3.1: 빈 문자열은 전송하지 않는다.
-	var trimmed := text.strip_edges()
+func _submit_chat() -> void:
+	# 4.3.1: 빈 문자열은 전송하지 않는다. text는 IME 확정 후 읽는다(CL-032).
+	var trimmed := _chat_input.text.strip_edges()
 	if trimmed != "":
 		_send({ "type": "chat", "text": trimmed })
 		# 서버 에코 여부와 무관하게 내 말풍선을 즉시 표시(낙관적).
@@ -189,6 +192,23 @@ const CHAT_INPUT_WIDTH := 560.0
 var _chat_input: LineEdit
 var _chat_active := false
 var _chat_bubbles := {}           # playerId -> { "text": String, "ttl": float }
+var _chat_submit_pending := false # CL-032: IME 확정 후 한 프레임 뒤 전송 예약
+
+func _input(event: InputEvent) -> void:
+	# CL-032: 채팅 입력 중에는 Enter/Esc를 LineEdit·IME보다 먼저 가로챈다.
+	if not _chat_active:
+		return
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+		# 조합 중인 한글이 text에 확정되도록 IME를 잠시 끈 뒤,
+		# 다음 프레임(_process)에서 확정된 text를 읽어 전송한다 → Enter 1회로 처리.
+		DisplayServer.window_set_ime_active(false)
+		_chat_submit_pending = true
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ESCAPE:
+		_close_chat()
+		get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):  # ESC
@@ -198,7 +218,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		else:
 			get_tree().quit()
 	elif event is InputEventKey and event.pressed and not event.echo and (event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER):
-		# CL-031: Enter로 채팅 입력 진입 (입력 중 Enter는 LineEdit이 소비해 전송됨)
+		# CL-031: Enter로 채팅 입력 진입 (입력 중 Enter 전송은 _input()에서 처리, CL-032)
 		if not _chat_active:
 			_open_chat()
 			# 진입에 쓴 Enter가 방금 포커스 받은 LineEdit으로 새어들어가 두 번 입력되는 것을 막는다.
@@ -244,6 +264,11 @@ func _process(delta: float) -> void:
 	_poll_ws()
 	_tick_reconnect(delta)
 	_tick_bubbles(delta)
+
+	# CL-032: IME 확정이 끝난 다음 프레임에 채팅 전송.
+	if _chat_submit_pending:
+		_chat_submit_pending = false
+		_submit_chat()
 
 	# delta 기반 이동으로 FPS와 무관하게 일정 속도.
 	if move_dir != 0:
