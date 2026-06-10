@@ -34,10 +34,8 @@ var _right_held := false
 var move_dir := 0          # -1=왼, 0=정지, +1=오른
 var facing := "right"      # protocol.md move의 facing 필드
 
-## 서버 연결 (protocol.md). roomId/name은 P0 고정값 (룸/닉네임 UI는 P1).
+## 서버 연결 (protocol.md). roomId/name은 메뉴 입력값(Session) 사용 (CL-022).
 const WS_URL := "ws://13.209.96.232:8080/ws"
-const ROOM_ID := "ROOM01"
-const PLAYER_NAME := "player"
 var _ws := WebSocketPeer.new()
 var _ws_state := WebSocketPeer.STATE_CLOSED
 var _joined := false       # STATE_OPEN 첫 프레임 join 중복 전송 방지
@@ -152,7 +150,8 @@ func _poll_ws() -> void:
 	if state == WebSocketPeer.STATE_OPEN:
 		if not _joined:
 			# STATE_OPEN 첫 프레임에 한 번만 전송 (protocol.md: 첫 메시지는 반드시 join)
-			_send({ "type": "join", "roomId": ROOM_ID, "name": PLAYER_NAME })
+			# CL-022: 메뉴에서 입력한 room/nickname 사용.
+			_send({ "type": "join", "roomId": Session.room_id, "name": Session.nickname })
 			_joined = true
 		while _ws.get_available_packet_count() > 0:
 			var msg = JSON.parse_string(_ws.get_packet().get_string_from_utf8())
@@ -181,6 +180,13 @@ func _handle(msg: Dictionary) -> void:
 		"player_left":
 			remote_players.erase(msg["playerId"])
 			queue_redraw()
+		"error":
+			# CL-022: ROOM_FULL 등 서버 error 수신 시 메시지를 들고 메뉴로 복귀.
+			var code: String = msg.get("code", "ERROR")
+			var detail: String = msg.get("message", "")
+			Session.last_error = "%s: %s" % [code, detail] if detail != "" else code
+			print("[WS] error: ", Session.last_error)
+			get_tree().change_scene_to_file("res://menu.tscn")
 
 func _draw() -> void:
 	# floorY 아래쪽을 바닥 영역으로 채운다. 윗변(y=floor_y)이 캐릭터가 서는 기준선.
