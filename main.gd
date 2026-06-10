@@ -49,6 +49,9 @@ var _last_sent_floor_x := -1.0
 var _last_sent_facing := ""
 
 func _ready() -> void:
+	# CL-017 실험: 캐릭터/바닥 외 영역을 투명하게. project.godot의 transparent 설정과 함께 동작.
+	get_viewport().transparent_bg = true
+
 	var err := _ws.connect_to_url(WS_URL)
 	if err != OK:
 		push_error("[WS] 연결 시도 실패: %s" % error_string(err))

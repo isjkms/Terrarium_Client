@@ -20,6 +20,8 @@ config/icon="res://icon.svg"
 window/size/viewport_width=1280
 window/size/viewport_height=240
 window/size/resizable=false
+window/size/transparent=true
+per_pixel_transparency/allowed=true
 
 [physics]
 
