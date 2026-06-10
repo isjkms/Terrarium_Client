@@ -2,7 +2,7 @@ extends Control
 
 ## CL-024: 메뉴/설정 화면. 게임 오버레이(1280×240, main.tscn)와 분리된 더 큰 창.
 ## 앱 시작 시 이 씬이 먼저 뜨고, "시작"을 누르면 게임 오버레이 씬으로 전환한다.
-const MENU_SIZE := Vector2i(800, 500)
+const MENU_SIZE := Vector2i(1280, 720)
 
 @onready var _room_edit: LineEdit = $Center/VBox/RoomEdit
 @onready var _nick_edit: LineEdit = $Center/VBox/NickEdit
