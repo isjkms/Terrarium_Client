@@ -40,6 +40,11 @@ var _ws := WebSocketPeer.new()
 var _ws_state := WebSocketPeer.STATE_CLOSED
 var _joined := false       # STATE_OPEN 첫 프레임 join 중복 전송 방지
 
+## CL-023: 끊김(STATE_CLOSED) 감지 시 일정 간격으로 자동 재연결
+const RECONNECT_DELAY := 3.0
+var _reconnecting := false
+var _reconnect_accum := 0.0
+
 ## move 송신 (20Hz throttle + 값 변화 감지)
 const MOVE_SEND_INTERVAL := 0.05
 var _send_accum := 0.0
@@ -115,6 +120,7 @@ func _recompute_dir() -> void:
 
 func _process(delta: float) -> void:
 	_poll_ws()
+	_tick_reconnect(delta)
 
 	# delta 기반 이동으로 FPS와 무관하게 일정 속도.
 	if move_dir != 0:
@@ -135,6 +141,23 @@ func _send_move(delta: float) -> void:
 		_last_sent_floor_x = my_floor_x
 		_last_sent_facing = facing
 
+func _tick_reconnect(delta: float) -> void:
+	# CL-023: 끊긴 상태에서 RECONNECT_DELAY 경과 시 재연결 시도. 성공하면 STATE_OPEN에서 join 재전송.
+	if not _reconnecting:
+		return
+	_reconnect_accum += delta
+	if _reconnect_accum < RECONNECT_DELAY:
+		return
+	_reconnect_accum = 0.0
+	_reconnecting = false
+	_joined = false  # 재연결 후 join을 다시 보내도록 초기화
+	print("[CL-023] 재연결 시도: ", WS_URL)
+	var err := _ws.connect_to_url(WS_URL)
+	if err != OK:
+		# 시도 자체가 실패하면 다시 대기 후 재시도.
+		push_error("[WS] 재연결 시도 실패: %s" % error_string(err))
+		_reconnecting = true
+
 func _poll_ws() -> void:
 	_ws.poll()
 	var state := _ws.get_ready_state()
@@ -144,6 +167,9 @@ func _poll_ws() -> void:
 				print("[WS] 연결 성공: ", WS_URL)
 			WebSocketPeer.STATE_CLOSED:
 				print("[WS] 연결 종료/실패")
+				# CL-023: 끊김 감지 시 자동 재연결 대기 시작.
+				_reconnecting = true
+				_reconnect_accum = 0.0
 		_ws_state = state
 		queue_redraw()  # CL-020: 연결 상태 텍스트 갱신
 
