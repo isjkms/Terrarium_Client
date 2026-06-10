@@ -201,7 +201,7 @@ func _draw_connection_status() -> void:
 		_:
 			label = "끊김"
 			color = Color(0.9, 0.3, 0.3)
-	draw_string(ThemeDB.fallback_font, Vector2(8, 16), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
+	draw_string(ThemeDB.fallback_font, Vector2(10, 28), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
 
 func _draw_character(floor_x: float, color: Color) -> void:
 	# 밑변이 바닥선(floor_y)에 닿도록 도형을 세운다.
