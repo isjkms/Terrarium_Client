@@ -84,6 +84,10 @@ func _position_window_bottom() -> void:
 ## CL-021: always-on-top 현재 상태 (project.godot window/size/always_on_top=true 기본값과 일치)
 var _always_on_top := true
 
+## CL-025: click-through(감상 모드) 현재 상태. 활성 시 창 아래 다른 앱을 클릭할 수 있다.
+## 마우스 입력은 통과하지만 키보드 입력은 유지되므로 C키로 다시 해제할 수 있다.
+var _click_through := false
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):  # ESC
 		get_tree().quit()
@@ -92,6 +96,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		_always_on_top = not _always_on_top
 		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, _always_on_top)
 		print("[CL-021] always-on-top: ", _always_on_top)
+	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_C:
+		# CL-025: C 키로 click-through(감상 모드) 토글
+		_click_through = not _click_through
+		DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_MOUSE_PASSTHROUGH, _click_through)
+		print("[CL-025] click-through: ", _click_through)
+		queue_redraw()
 	elif event.is_action_pressed("ui_left"):
 		_left_held = true
 		_set_dir(-1)
@@ -245,6 +255,10 @@ func _draw_connection_status() -> void:
 			label = "끊김"
 			color = Color(0.9, 0.3, 0.3)
 	draw_string(ThemeDB.fallback_font, Vector2(10, 28), label, HORIZONTAL_ALIGNMENT_LEFT, -1, 22, color)
+
+	# CL-025: 감상 모드(click-through) 활성 시 안내 표시. C키로 해제 가능함을 함께 알린다.
+	if _click_through:
+		draw_string(ThemeDB.fallback_font, Vector2(10, 52), "감상 모드 (C키 해제)", HORIZONTAL_ALIGNMENT_LEFT, -1, 18, Color(0.6, 0.8, 1.0))
 
 func _draw_character(floor_x: float, color: Color) -> void:
 	# 밑변이 바닥선(floor_y)에 닿도록 도형을 세운다.
